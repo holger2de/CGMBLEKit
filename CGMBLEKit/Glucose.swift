@@ -23,7 +23,8 @@ public struct Glucose {
         glucoseMessage: GlucoseRxMessage,
         timeMessage: TransmitterTimeRxMessage,
         calibrationMessage: CalibrationDataRxMessage? = nil,
-        activationDate: Date
+        activationDate: Date,
+        isAnubis: Bool? = nil
     ) {
         self.init(
             transmitterID: transmitterID,
@@ -31,7 +32,8 @@ public struct Glucose {
             glucoseMessage: glucoseMessage.glucose,
             timeMessage: timeMessage,
             calibrationMessage: calibrationMessage,
-            activationDate: activationDate
+            activationDate: activationDate,
+            isAnubis: isAnubis
         )
     }
 
@@ -41,7 +43,8 @@ public struct Glucose {
         glucoseMessage: GlucoseSubMessage,
         timeMessage: TransmitterTimeRxMessage,
         calibrationMessage: CalibrationDataRxMessage? = nil,
-        activationDate: Date
+        activationDate: Date,
+        isAnubis: Bool? = nil
     ) {
         self.transmitterID = transmitterID
         self.glucoseMessage = glucoseMessage
@@ -52,7 +55,8 @@ public struct Glucose {
         if timeMessage.hasValidSensorSession {
             let sessionStartDate = activationDate.addingTimeInterval(TimeInterval(timeMessage.sessionStartTime))
             self.sessionStartDate = sessionStartDate
-            self.sessionExpDate = sessionStartDate.addingTimeInterval(10*24*60*60)
+            let sensorLifetimeDays = isAnubis == true ? 60.0 : 10.0
+            self.sessionExpDate = sessionStartDate.addingTimeInterval(sensorLifetimeDays * 24 * 60 * 60)
         } else {
             sessionStartDate = nil
             sessionExpDate = nil

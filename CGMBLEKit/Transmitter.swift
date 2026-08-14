@@ -64,6 +64,8 @@ public final class Transmitter: BluetoothManagerDelegate {
 
     public var passiveModeEnabled: Bool
 
+    public internal(set) var isAnubis: Bool?
+
     public weak var delegate: TransmitterDelegate?
 
     public weak var commandSource: TransmitterCommandSource?
@@ -98,10 +100,11 @@ public final class Transmitter: BluetoothManagerDelegate {
 
     private let delegateQueue = DispatchQueue(label: "com.loudnate.CGMBLEKit.delegateQueue", qos: .unspecified)
 
-    public init(id: String, activationDate: Date?, peripheralIdentifier: UUID? = nil, passiveModeEnabled: Bool = false) {
+    public init(id: String, activationDate: Date?, peripheralIdentifier: UUID? = nil, passiveModeEnabled: Bool = false, isAnubis: Bool? = nil) {
         self.id = TransmitterID(id: id)
         self.passiveModeEnabled = passiveModeEnabled
         self.activationDate = activationDate
+        self.isAnubis = isAnubis
 
         bluetoothManager.peripheralIdentifier = peripheralIdentifier
         bluetoothManager.delegate = self
@@ -191,7 +194,17 @@ public final class Transmitter: BluetoothManagerDelegate {
                     let activationDate = Date(timeIntervalSinceNow: -TimeInterval(timeMessage.currentTime))
                     self.log.debug("Determined activation date: %@", String(describing: activationDate))
 
-                    while let command = self.commandSource?.dequeuePendingCommand(for: self) {
+                    if self.isAnubis == nil {
+                    do {
+                        let versionMessage = try peripheral.readVersionMessage()
+                        self.isAnubis = versionMessage.isAnubis
+                        self.log.info("Detected Anubis transmitter: %{public}@", String(describing: versionMessage.isAnubis))
+                    } catch {
+                        self.log.error("Unable to read transmitter version: %{public}@", String(describing: error))
+                    }
+                }
+
+                while let command = self.commandSource?.dequeuePendingCommand(for: self) {
                         self.log.debug("Sending command: %@", String(describing: command))
                         do {
                             _ = try peripheral.sendCommand(command, activationDate: activationDate)
@@ -211,7 +224,8 @@ public final class Transmitter: BluetoothManagerDelegate {
                         glucoseMessage: glucoseMessage,
                         timeMessage: timeMessage,
                         calibrationMessage: calibrationMessage,
-                        activationDate: activationDate
+                        activationDate: activationDate,
+                    isAnubis: self.isAnubis
                     )
 
                     self.delegateQueue.async {
@@ -249,7 +263,7 @@ public final class Transmitter: BluetoothManagerDelegate {
                 let activationDate = activationDate
             {
                 delegateQueue.async {
-                    self.delegate?.transmitter(self, didRead: Glucose(transmitterID: self.id.id, glucoseMessage: glucoseMessage, timeMessage: timeMessage, calibrationMessage: self.lastCalibrationMessage, activationDate: activationDate))
+                    self.delegate?.transmitter(self, didRead: Glucose(transmitterID: self.id.id, glucoseMessage: glucoseMessage, timeMessage: timeMessage, calibrationMessage: self.lastCalibrationMessage, activationDate: activationDate, isAnubis: self.isAnubis))
                 }
             } else {
                 delegateQueue.async {
@@ -271,6 +285,10 @@ public final class Transmitter: BluetoothManagerDelegate {
         case .transmitterTimeRx?:
             if let timeMessage = TransmitterTimeRxMessage(data: response) {
                 self.lastTimeMessage = timeMessage
+            }
+        case .transmitterVersionRx?:
+            if let versionMessage = TransmitterVersionRxMessage(data: response) {
+                self.isAnubis = versionMessage.isAnubis
             }
         case .glucoseBackfillRx?:
             guard let backfillMessage = GlucoseBackfillRxMessage(data: response) else {
@@ -310,7 +328,7 @@ public final class Transmitter: BluetoothManagerDelegate {
             }
 
             let glucose = backfillBuffer.glucose.map {
-                Glucose(transmitterID: id.id, status: backfillMessage.status, glucoseMessage: $0, timeMessage: timeMessage, activationDate: activationDate)
+                Glucose(transmitterID: id.id, status: backfillMessage.status, glucoseMessage: $0, timeMessage: timeMessage, activationDate: activationDate, isAnubis: isAnubis)
             }
 
             guard glucose.count > 0 else {
@@ -509,6 +527,14 @@ fileprivate extension PeripheralManager {
             return try writeMessage(TransmitterTimeTxMessage(), for: .control)
         } catch let error {
             throw TransmitterError.controlError("Error getting time: \(error)")
+        }
+    }
+
+    func readVersionMessage() throws -> TransmitterVersionRxMessage {
+        do {
+            return try writeMessage(TransmitterVersionTxMessage(), for: .control)
+        } catch let error {
+            throw TransmitterError.controlError("Error getting transmitter version: \(error)")
         }
     }
 

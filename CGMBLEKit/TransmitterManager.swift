@@ -69,6 +69,17 @@ public class TransmitterManager: TransmitterDelegate {
 
         return false
     }
+
+    public var isAnubis: Bool {
+        state.isAnubis == true
+    }
+
+    public func setAnubisModeEnabled(_ enabled: Bool) {
+        transmitter.isAnubis = enabled
+        mutateState { state in
+            state.isAnubis = enabled
+        }
+    }
     
     public var cgmManagerStatus: CGMManagerStatus {
         return CGMManagerStatus(hasValidSensorSession: hasValidSensorSession, device: device)
@@ -76,7 +87,7 @@ public class TransmitterManager: TransmitterDelegate {
 
     public required init(state: TransmitterManagerState) {
         self.lockedState = Locked(state)
-        self.transmitter = Transmitter(id: state.transmitterID, activationDate: state.transmitterStartDate, passiveModeEnabled: state.passiveModeEnabled)
+        self.transmitter = Transmitter(id: state.transmitterID, activationDate: state.transmitterStartDate, passiveModeEnabled: state.passiveModeEnabled, isAnubis: state.isAnubis)
         self.shareManager = ShareClientManager()
 
         self.transmitter.delegate = self
@@ -310,6 +321,12 @@ public class TransmitterManager: TransmitterDelegate {
     }
 
     public func transmitter(_ transmitter: Transmitter, didRead glucose: Glucose) {
+        if state.isAnubis != transmitter.isAnubis {
+            mutateState { state in
+                state.isAnubis = transmitter.isAnubis
+            }
+        }
+
         guard glucose != latestReading else {
             updateDelegate(with: .noData)
             return
@@ -325,7 +342,7 @@ public class TransmitterManager: TransmitterDelegate {
                 date: glucose.activationDate,
                 type: .transmitterStart,
                 deviceIdentifier: transmitter.ID,
-                expectedLifetime: .hours(24 * 90)
+                expectedLifetime: .hours(24 * (isAnubis ? 180 : 90))
             ))
         }
 
@@ -341,8 +358,8 @@ public class TransmitterManager: TransmitterDelegate {
                     date: sessionStartDate,
                     type: .sensorStart,
                     deviceIdentifier: transmitter.ID,
-                    expectedLifetime: .hours(24 * 10),
-                    warmupPeriod: .hours(2)
+                    expectedLifetime: .hours(24 * (isAnubis ? 60 : 10)),
+                    warmupPeriod: isAnubis ? .minutes(50) : .hours(2)
                 ))
             } else {
                 log.error("Ignoring sensor start event with invalid session start time: %{public}@", String(describing: glucose))

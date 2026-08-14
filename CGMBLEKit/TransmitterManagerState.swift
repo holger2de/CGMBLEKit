@@ -22,18 +22,22 @@ public struct TransmitterManagerState: RawRepresentable, Equatable {
 
     public var sensorStartOffset: UInt32?
 
+    public var isAnubis: Bool?
+
     public var shouldSyncToRemoteService: Bool
 
     public init(
         transmitterID: String,
         shouldSyncToRemoteService: Bool = true,
         transmitterStartDate: Date? = nil,
-        sensorStartOffset: UInt32? = nil
+        sensorStartOffset: UInt32? = nil,
+        isAnubis: Bool? = nil
     ) {
         self.transmitterID = transmitterID
         self.shouldSyncToRemoteService = shouldSyncToRemoteService
         self.transmitterStartDate = transmitterStartDate
         self.sensorStartOffset = sensorStartOffset
+        self.isAnubis = isAnubis
     }
 
     public init?(rawValue: RawValue) {
@@ -48,11 +52,14 @@ public struct TransmitterManagerState: RawRepresentable, Equatable {
 
         let sensorStartOffset = rawValue["sensorStartOffset"] as? UInt32
 
+        let isAnubis = rawValue["isAnubis"] as? Bool
+
         self.init(
             transmitterID: transmitterID,
             shouldSyncToRemoteService: shouldSyncToRemoteService,
             transmitterStartDate: transmitterStartDate,
-            sensorStartOffset: sensorStartOffset
+            sensorStartOffset: sensorStartOffset,
+            isAnubis: isAnubis
         )
     }
 
@@ -64,6 +71,7 @@ public struct TransmitterManagerState: RawRepresentable, Equatable {
 
         rval["transmitterStartDate"] = transmitterStartDate
         rval["sensorStartOffset"] = sensorStartOffset
+        rval["isAnubis"] = isAnubis
 
         return rval
     }
