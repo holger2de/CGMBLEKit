@@ -617,6 +617,18 @@ extension G6CGMManager {
 
 extension TransmitterManager {
 
+    public func startSensor(at date: Date = Date()) {
+        enqueueCommand(.startSensor(at: date))
+    }
+
+    public func startSensor(sensorCode: String, at date: Date = Date()) {
+        enqueueCommand(.startSensorWithCode(at: date, sensorCode: sensorCode))
+    }
+
+    public func stopSensor(at date: Date = Date()) {
+        enqueueCommand(.stopSensor(at: date))
+    }
+
     public func enqueueCommand(_ command: Command) {
         pendingCommands.mutate { commands in
             commands.append(command)
