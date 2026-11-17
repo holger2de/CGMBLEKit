@@ -636,6 +636,10 @@ extension TransmitterManager {
         enqueueCommand(.stopSensor(at: date))
     }
 
+    public func calibrateSensor(to glucose: HKQuantity, at date: Date = Date()) {
+        enqueueCommand(.calibrateSensor(to: glucose, at: date))
+    }
+
     public func shutdown() {
         setCommandResultHandler(nil)
         pendingCommands.mutate { $0.removeAll() }
