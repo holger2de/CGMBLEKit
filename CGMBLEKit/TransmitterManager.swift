@@ -636,6 +636,11 @@ extension TransmitterManager {
         enqueueCommand(.stopSensor(at: date))
     }
 
+    public func shutdown() {
+        setCommandResultHandler(nil)
+        transmitter.stopScanning()
+    }
+
     public func setCommandResultHandler(_ handler: CommandResultHandler?) {
         commandResultHandler.mutate { currentHandler in
             currentHandler = handler
