@@ -60,6 +60,9 @@ public class TransmitterManager: TransmitterDelegate, TransmitterCommandSource {
     // Pending transmitter commands. Access is serialized with Locked.
     private let pendingCommands = Locked<[Command]>([])
 
+    public typealias CommandResultHandler = (_ command: Command, _ error: Error?) -> Void
+    private let commandResultHandler = Locked<CommandResultHandler?>(nil)
+
 
     public var hasValidSensorSession: Bool {
         if let latestReading = latestReading {
@@ -633,6 +636,12 @@ extension TransmitterManager {
         enqueueCommand(.stopSensor(at: date))
     }
 
+    public func setCommandResultHandler(_ handler: CommandResultHandler?) {
+        commandResultHandler.mutate { currentHandler in
+            currentHandler = handler
+        }
+    }
+
     public func enqueueCommand(_ command: Command) {
         pendingCommands.mutate { commands in
             commands.append(command)
@@ -663,6 +672,11 @@ extension TransmitterManager {
             String(describing: command),
             String(describing: error)
         )
+
+        let handler = commandResultHandler.value
+        DispatchQueue.main.async {
+            handler?(command, error)
+        }
     }
 
     public func transmitter(_ transmitter: Transmitter, didComplete command: Command) {
@@ -670,5 +684,10 @@ extension TransmitterManager {
             "Transmitter command completed: %{public}@",
             String(describing: command)
         )
+
+        let handler = commandResultHandler.value
+        DispatchQueue.main.async {
+            handler?(command, nil)
+        }
     }
 }
