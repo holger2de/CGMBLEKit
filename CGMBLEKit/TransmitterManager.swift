@@ -80,6 +80,27 @@ public class TransmitterManager: TransmitterDelegate, TransmitterCommandSource {
         state.isAnubis == true
     }
 
+    public var sensorSessionStartDate: Date? {
+        if let sessionStartDate = latestReading?.sessionStartDate {
+            return sessionStartDate
+        }
+
+        guard let transmitterStartDate = state.transmitterStartDate,
+              let sensorStartOffset = state.sensorStartOffset,
+              sensorStartOffset != TransmitterTimeRxMessage.noActiveSessionStartTime
+        else {
+            return nil
+        }
+
+        return transmitterStartDate.addingTimeInterval(TimeInterval(sensorStartOffset))
+    }
+
+    public var sensorWarmupEndDate: Date? {
+        guard let startDate = sensorSessionStartDate else { return nil }
+        let warmupSeconds: TimeInterval = isAnubis ? 50 * 60 : 2 * 60 * 60
+        return startDate.addingTimeInterval(warmupSeconds)
+    }
+
     public func setAnubisModeEnabled(_ enabled: Bool) {
         transmitter.isAnubis = enabled
         mutateState { state in
