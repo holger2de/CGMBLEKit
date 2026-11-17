@@ -14,6 +14,7 @@ public enum Command: RawRepresentable {
     public typealias RawValue = [String: Any]
 
     case startSensor(at: Date)
+    case startSensorWithCode(at: Date, sensorCode: String)
     case stopSensor(at: Date)
     case calibrateSensor(to: HKQuantity, at: Date)
     case resetTransmitter
@@ -30,7 +31,12 @@ public enum Command: RawRepresentable {
             guard let date = date else {
                 return nil
             }
-            self = .startSensor(at: date)
+
+            if let sensorCode = rawValue["sensorCode"] as? String {
+                self = .startSensorWithCode(at: date, sensorCode: sensorCode)
+            } else {
+                self = .startSensor(at: date)
+            }
         case .stopSensor?:
             guard let date = date else {
                 return nil
@@ -58,6 +64,12 @@ public enum Command: RawRepresentable {
             return [
                 "action": Action.startSensor.rawValue,
                 "date": date
+            ]
+        case .startSensorWithCode(let date, let sensorCode):
+            return [
+                "action": Action.startSensor.rawValue,
+                "date": date,
+                "sensorCode": sensorCode
             ]
         case .stopSensor(let date):
             return [

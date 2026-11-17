@@ -584,6 +584,22 @@ fileprivate extension PeripheralManager {
                 let startTime = UInt32(date.timeIntervalSince(activationDate))
                 let secondsSince1970 = UInt32(date.timeIntervalSince1970)
                 return try writeMessage(SessionStartTxMessage(startTime: startTime, secondsSince1970: secondsSince1970), for: .control)
+            case .startSensorWithCode(let date, let sensorCode):
+                let startTime = UInt32(date.timeIntervalSince(activationDate))
+                let secondsSince1970 = UInt32(date.timeIntervalSince1970)
+
+                guard let calibrationParameters = DexcomCalibrationParameters(sensorCode: sensorCode) else {
+                    throw TransmitterError.controlError("Invalid Dexcom G6 sensor code: \(sensorCode)")
+                }
+
+                return try writeMessage(
+                    SessionStartTxMessage(
+                        startTime: startTime,
+                        secondsSince1970: secondsSince1970,
+                        calibrationParameters: calibrationParameters
+                    ),
+                    for: .control
+                )
             case .stopSensor(let date):
                 let stopTime = UInt32(date.timeIntervalSince(activationDate))
                 return try writeMessage(SessionStopTxMessage(stopTime: stopTime), for: .control)
