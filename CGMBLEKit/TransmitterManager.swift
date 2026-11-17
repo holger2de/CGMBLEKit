@@ -638,6 +638,8 @@ extension TransmitterManager {
 
     public func shutdown() {
         setCommandResultHandler(nil)
+        pendingCommands.mutate { $0.removeAll() }
+        transmitter.stayConnected = false
         transmitter.stopScanning()
     }
 
