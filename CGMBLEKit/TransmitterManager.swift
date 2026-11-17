@@ -622,7 +622,11 @@ extension TransmitterManager {
             commands.append(command)
         }
 
-        transmitter.resumeScanning()
+        if transmitter.passiveModeEnabled {
+            transmitter.requestActiveCommandCycle()
+        } else {
+            transmitter.resumeScanning()
+        }
     }
 
     public func dequeuePendingCommand(for transmitter: Transmitter) -> Command? {

@@ -64,6 +64,19 @@ public final class Transmitter: BluetoothManagerDelegate {
 
     public var passiveModeEnabled: Bool
 
+    /// Tracks requested and completed one-shot active command cycles.
+    private struct ActiveCommandCycleState {
+        var requestedGeneration = 0
+        var completedGeneration = 0
+    }
+
+    private let activeCommandCycleState = Locked(ActiveCommandCycleState())
+
+    private var shouldUsePassiveMode: Bool {
+        let state = activeCommandCycleState.value
+        return passiveModeEnabled && state.completedGeneration >= state.requestedGeneration
+    }
+
     public internal(set) var isAnubis: Bool?
 
     public weak var delegate: TransmitterDelegate?
@@ -108,6 +121,17 @@ public final class Transmitter: BluetoothManagerDelegate {
 
         bluetoothManager.peripheralIdentifier = peripheralIdentifier
         bluetoothManager.delegate = self
+    }
+
+    func requestActiveCommandCycle() {
+        activeCommandCycleState.mutate { state in
+            state.requestedGeneration &+= 1
+        }
+
+        // Break an existing passive connection. If we are only scanning,
+        // disconnect() stops that scan, so start scanning again immediately.
+        bluetoothManager.disconnect()
+        bluetoothManager.scanForPeripheral()
     }
 
     public func resumeScanning() {
@@ -161,7 +185,7 @@ public final class Transmitter: BluetoothManagerDelegate {
         }
 
         peripheralManager.perform { (peripheral) in
-            if self.passiveModeEnabled {
+            if self.shouldUsePassiveMode {
                 self.log.debug("Listening for authentication responses in passive mode")
                 do {
                     try peripheral.listenToCharacteristic(.authentication)
@@ -183,9 +207,21 @@ public final class Transmitter: BluetoothManagerDelegate {
                     }
 
                     try peripheral.enableNotify(shouldWaitForBond: !status.isBonded)
+                    let commandCycleGeneration = self.activeCommandCycleState.value.requestedGeneration
+                    var commandCycleCompleted = false
+
                     defer {
                         self.log.debug("Initiating a disconnect")
                         peripheral.disconnect()
+
+                        if commandCycleCompleted {
+                            self.activeCommandCycleState.mutate { state in
+                                state.completedGeneration = max(
+                                    state.completedGeneration,
+                                    commandCycleGeneration
+                                )
+                            }
+                        }
                     }
 
                     self.log.debug("Reading time")
@@ -213,6 +249,8 @@ public final class Transmitter: BluetoothManagerDelegate {
                             self.commandSource?.transmitter(self, didFail: command, with: error)
                         }
                     }
+
+                    commandCycleCompleted = true
 
                     self.log.debug("Reading glucose")
                     let glucoseMessage = try peripheral.readGlucose()
@@ -252,7 +290,7 @@ public final class Transmitter: BluetoothManagerDelegate {
     }
 
     func bluetoothManager(_ manager: BluetoothManager, peripheralManager: PeripheralManager, didReceiveControlResponse response: Data) {
-        guard passiveModeEnabled else { return }
+        guard shouldUsePassiveMode else { return }
 
         guard response.count > 0 else { return }
 
