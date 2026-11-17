@@ -15,7 +15,7 @@ public protocol TransmitterManagerObserver: AnyObject {
 }
 
 
-public class TransmitterManager: TransmitterDelegate {
+public class TransmitterManager: TransmitterDelegate, TransmitterCommandSource {
 
     var state: TransmitterManagerState {
         get {
@@ -57,6 +57,9 @@ public class TransmitterManager: TransmitterDelegate {
 
     private let observers = WeakSynchronizedSet<TransmitterManagerObserver>()
 
+    // Pending transmitter commands. Access is serialized with Locked.
+    private let pendingCommands = Locked<[Command]>([])
+
 
     public var hasValidSensorSession: Bool {
         if let latestReading = latestReading {
@@ -91,6 +94,7 @@ public class TransmitterManager: TransmitterDelegate {
         self.shareManager = ShareClientManager()
 
         self.transmitter.delegate = self
+        self.transmitter.commandSource = self
         
         #if targetEnvironment(simulator)
         setupSimulatedSampleGenerator()
@@ -607,4 +611,44 @@ extension G6CGMManager {
 extension G6CGMManager {
     public func getSoundBaseURL() -> URL? { return nil }
     public func getSounds() -> [Alert.Sound] { return [] }
+}
+
+// MARK: - TransmitterCommandSource
+
+extension TransmitterManager {
+
+    public func enqueueCommand(_ command: Command) {
+        pendingCommands.mutate { commands in
+            commands.append(command)
+        }
+
+        transmitter.resumeScanning()
+    }
+
+    public func dequeuePendingCommand(for transmitter: Transmitter) -> Command? {
+        var command: Command?
+
+        pendingCommands.mutate { commands in
+            if !commands.isEmpty {
+                command = commands.removeFirst()
+            }
+        }
+
+        return command
+    }
+
+    public func transmitter(_ transmitter: Transmitter, didFail command: Command, with error: Error) {
+        log.error(
+            "Transmitter command %{public}@ failed: %{public}@",
+            String(describing: command),
+            String(describing: error)
+        )
+    }
+
+    public func transmitter(_ transmitter: Transmitter, didComplete command: Command) {
+        log.default(
+            "Transmitter command completed: %{public}@",
+            String(describing: command)
+        )
+    }
 }
