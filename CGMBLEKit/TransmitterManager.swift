@@ -617,6 +617,10 @@ extension G6CGMManager {
 
 extension TransmitterManager {
 
+    public static func isValidSensorCode(_ sensorCode: String) -> Bool {
+        return DexcomCalibrationParameters(sensorCode: sensorCode) != nil
+    }
+
     public func startSensor(at date: Date = Date()) {
         enqueueCommand(.startSensor(at: date))
     }
